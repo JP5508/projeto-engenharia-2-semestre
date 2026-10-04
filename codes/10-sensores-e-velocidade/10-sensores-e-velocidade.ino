@@ -104,20 +104,20 @@ void loop() {
   if (distance < 10) {
 
     tras(255);
-    delay(300);
+    //delay(300);
 
     // Se o lado direito está bloqueado,
     // tenta escapar pela esquerda
     if (valor_IR_D == LOW) {
-      virarEsquerda(80);
+      virarEsquerda(100);
     }
 
     // Caso contrário, tenta pela direita
     else {
-      virarDireita(80);
+      virarDireita(100);
     }
 
-    delay(500);
+    //delay(500);
   }
 
   // ===================
@@ -128,21 +128,21 @@ void loop() {
 
     // Direito detectou → esquerda
     if (valor_IR_D == LOW) {
-      virarEsquerda(80);
-      delay(250);
+      virarEsquerda(100);
+      //delay(250);
     }
 
     // Esquerdo detectou → direita
     else if (valor_IR_E == LOW) {
-      virarDireita(80);
-      delay(250);
+      virarDireita(100);
+      //delay(250);
     }
 
     // US viu obstáculo, mas IR não indicou
     // lado → começa a procurar uma saída
     else {
-      virarEsquerda(80);
-      delay(300);
+      virarEsquerda(100);
+      //delay(300);
     }
   }
 
@@ -155,15 +155,15 @@ void loop() {
     // Obstáculo diagonal à direita
     if (valor_IR_D == LOW) {
 
-      virarEsquerda(80);
-      delay(150);
+      virarEsquerda(100);
+      //delay(150);
     }
 
     // Obstáculo diagonal à esquerda
     else if (valor_IR_E == LOW) {
 
-      virarDireita(80);
-      delay(150);
+      virarDireita(100);
+      //delay(150);
     }
 
     // Tudo livre
@@ -253,3 +253,9 @@ void parar() {
   analogWrite(ENA, 0);
   analogWrite(ENB, 0);
 }
+
+/*
+ERROS E OBSERVAÇÕES
+- carrinho ficando preso, se pa tem que colocar um algo para reconhecer quando o carrinho estiver mt tempo reconhecendo o mesmo sensor ele voltar para tras
+- ver o bglh do giroscopio falso
+*/
