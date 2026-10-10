@@ -186,9 +186,9 @@ void parar() {
   analogWrite(ENB, 0);
 }
 
-// =====
-// LOOP
-// =====
+// ==============
+//      LOOP
+// ==============
 
 void loop() {
 
@@ -225,8 +225,23 @@ void loop() {
 
   //OBSTACULO A FRENTE
   if (distance < 10) {
-  tras(50);
-  delay(500);
+    tras(100);
+    delay(500);
+    valor_IR_E = digitalRead(SENSOR_E);
+    valor_IR_D = digitalRead(SENSOR_D);
+    if (valor_IR_E == HIGH && valor_IR_D == HIGH) {
+      if (virarPara == false) {
+        frenteE(50);
+      } else {
+        frenteD(50);
+      } virarPara = !virarPara;
+    } else if (valor_IR_E == HIGH && valor_IR_D == LOW) {
+      frenteE(50);
+    } else if (valor_IR_E == LOW && valor_IR_D == HIGH) {
+      frenteD(50);
+    } else {
+      tras(100);
+    }
   }
   //OBSTACULO NA ESQUERDA
   else if (valor_IR_E == LOW && valor_IR_D == HIGH) {
