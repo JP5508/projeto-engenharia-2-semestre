@@ -29,47 +29,59 @@
 // LED DO ESP
 #define LED 2
 
-// ==================
-// VARIÁVEIS GLOBAIS
-// ==================
+// ==========
+// VARIÁVEIS
+// ==========
 
 long duration;
 float distance;
 
-boolean virarPara = false;
-// false = esquerda, true = direita
+const float DISTANCIA_OBSTACULO = 15.0;
 
-/*
-unsigned long inicio_estado, fim_estado;
-inicio_estado = millis()
-fim_estado = millis() - inicio_estado;
-*/
+// Tempos em milissegundos
+const unsigned long TEMPO_RECUO = 350;
+const unsigned long TEMPO_CURVA = 400;
+
+// Tempo maximo avancando sem detectar situacao
+// que indique obstaculo ou borda.
+// E uma estimativa para testar, nao uma medida real.
+const unsigned long TEMPO_RECUPERACAO = 10000;
+
+enum Estado
+{
+  SEGUINDO,
+  RECUANDO,
+  VIRANDO_ESQUERDA,
+  VIRANDO_DIREITA
+};
+
+Estado estado = SEGUINDO;
+
+unsigned long inicioEstado = 0;
+unsigned long inicioAvanco = 0;
+
+bool proximaViradaEsquerda = true;
 
 // ======
 // SETUP
 // ======
 
-void setup() {
-
-  //ESP
+void setup()
+{
   Serial.begin(115200);
   pinMode(LED, OUTPUT);
 
-  // Ultrassônico
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 
-  // Sensores IR
   pinMode(SENSOR_E, INPUT);
   pinMode(SENSOR_D, INPUT);
 
-  // Motores
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
 
-  // Velocidade
   pinMode(ENA, OUTPUT);
   pinMode(ENB, OUTPUT);
 }
@@ -78,8 +90,8 @@ void setup() {
 // FUNÇÕES DOS MOTORES
 // ====================
 
-void frente(int porc) {
-
+void frente(int porc)
+{
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, HIGH);
 
@@ -88,91 +100,78 @@ void frente(int porc) {
 
   digitalWrite(LED, HIGH);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
   analogWrite(ENA, vel);
   analogWrite(ENB, vel);
 }
 
-void tras(int porc) {
-
+void tras(int porc)
+{
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
 
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, HIGH);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
   analogWrite(ENA, vel);
   analogWrite(ENB, vel);
 }
 
-void frenteE(int porc) {
-
-  // Motor esquerdo anda
+void frenteE(int porc)
+{
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, HIGH);
 
-  // Motor direito para
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
   analogWrite(ENA, vel);
   analogWrite(ENB, vel);
 }
 
-void frenteD(int porc) {
-
-  // Motor esquerdo para
+void frenteD(int porc)
+{
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
 
-  // Motor direito anda
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
   analogWrite(ENA, vel);
   analogWrite(ENB, vel);
 }
-void trasE(int porc) {
 
-  // Motor esquerdo anda
+void trasE(int porc)
+{
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
 
-  // Motor direito para
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
   analogWrite(ENA, vel);
   analogWrite(ENB, vel);
 }
 
-void trasD(int porc) {
-
-  // Motor esquerdo para
+void trasD(int porc)
+{
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
 
-  // Motor direito anda
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, HIGH);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
   analogWrite(ENA, vel);
   analogWrite(ENB, vel);
 }
 
-void parar() {
-
+void parar()
+{
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
 
@@ -181,20 +180,33 @@ void parar() {
 
   digitalWrite(LED, LOW);
 
-  // Velocidade PWM
   analogWrite(ENA, 0);
   analogWrite(ENB, 0);
 }
 
-// ==============
+// =========================
+// INICIAR MANOBRA DE RECUO
+// =========================
+
+void iniciarRecuo()
+{
+  estado = RECUANDO;
+  inicioEstado = millis();
+
+  // Alterna o lado escolhido quando nao ha
+  // informacao suficiente dos sensores.
+  proximaViradaEsquerda = !proximaViradaEsquerda;
+}
+
+// ============================================================================
 //      LOOP
-// ==============
+// ============================================================================
 
-void loop() {
-
-  // ========================
-  // LEITURA DO ULTRASSÔNICO
-  // ========================
+void loop()
+{
+  // ====================
+  // LEITURA DOS SENSORES
+  // ====================
 
   digitalWrite(TRIG_PIN, LOW);
   delayMicroseconds(2);
@@ -206,83 +218,135 @@ void loop() {
 
   duration = pulseIn(ECHO_PIN, HIGH, 30000);
 
-  if (duration == 0) {
+  if (duration == 0)
+  {
     distance = 999;
-  } else {
+  }
+  else
+  {
     distance = duration * 0.0343 / 2;
   }
-
-  // ===============
-  // LEITURA DOS IR
-  // ===============
 
   int valor_IR_E = digitalRead(SENSOR_E);
   int valor_IR_D = digitalRead(SENSOR_D);
 
-  // ==================
-  // LÓGICA DE DECISÃO
-  // ==================
+  unsigned long agora = millis();
 
-  //OBSTACULO A FRENTE
-  if (distance < 10) {
-    tras(100);
-    delay(500);
-    valor_IR_E = digitalRead(SENSOR_E);
-    valor_IR_D = digitalRead(SENSOR_D);
-    if (valor_IR_E == HIGH && valor_IR_D == HIGH) {
-      if (virarPara == false) {
-        frenteE(50);
-      } else {
-        frenteD(50);
-      } virarPara = !virarPara;
-    } else if (valor_IR_E == HIGH && valor_IR_D == LOW) {
-      frenteE(50);
-    } else if (valor_IR_E == LOW && valor_IR_D == HIGH) {
-      frenteD(50);
-    } else {
-      tras(100);
+  // ====================
+  // MAQUINA DE ESTADOS
+  // ====================
+
+  switch (estado)
+  {
+  case SEGUINDO:
+
+    // Obstaculo a frente:
+    // recua antes de escolher para qual lado virar.
+    if (distance < DISTANCIA_OBSTACULO)
+    {
+      iniciarRecuo();
     }
-  }
-  //OBSTACULO NA ESQUERDA
-  else if (valor_IR_E == LOW && valor_IR_D == HIGH) {
+
+    // Os dois sensores laterais detectam algo.
+    else if (valor_IR_E == LOW &&
+             valor_IR_D == LOW)
+    {
+      iniciarRecuo();
+    }
+
+    // Obstaculo ou borda detectado a esquerda:
+    // tenta virar para a direita.
+    else if (valor_IR_E == LOW)
+    {
+      estado = VIRANDO_DIREITA;
+      inicioEstado = agora;
+    }
+
+    // Obstaculo ou borda detectado a direita:
+    // tenta virar para a esquerda.
+    else if (valor_IR_D == LOW)
+    {
+      estado = VIRANDO_ESQUERDA;
+      inicioEstado = agora;
+    }
+
+    // Recuperacao temporizada:
+    // tenta escapar se ficou avancando por muito tempo
+    // sem que nenhum sensor indique uma situacao.
+    else if (agora - inicioAvanco >=
+             TEMPO_RECUPERACAO)
+    {
+      iniciarRecuo();
+    }
+
+    else
+    {
+      frente(100);
+    }
+
+    break;
+
+  case RECUANDO:
+
+    tras(40);
+
+    if (agora - inicioEstado >= TEMPO_RECUO)
+    {
+
+      // Se apenas um lado esta livre segundo
+      // os sensores, tenta virar para esse lado.
+      if (valor_IR_E == LOW &&
+          valor_IR_D == HIGH)
+      {
+        estado = VIRANDO_DIREITA;
+      }
+      else if (valor_IR_D == LOW &&
+               valor_IR_E == HIGH)
+      {
+        estado = VIRANDO_ESQUERDA;
+      }
+      else
+      {
+        // Sem uma direcao evidente, alterna o lado.
+        if (proximaViradaEsquerda)
+        {
+          estado = VIRANDO_ESQUERDA;
+        }
+        else
+        {
+          estado = VIRANDO_DIREITA;
+        }
+      }
+
+      inicioEstado = agora;
+    }
+
+    break;
+
+  case VIRANDO_ESQUERDA:
+
+    // A roda direita avanca para virar a esquerda.
     frenteD(50);
-  }
-  
-  //OBSTACULO NA DIREITA
-  else if (valor_IR_E == HIGH && valor_IR_D == LOW) {
-    frenteE(50);
-  }
 
-  //OBSTACULO AO REDOR
-  else if (valor_IR_E == LOW && valor_IR_D == LOW) {
-    tras(100);
-    valor_IR_E = digitalRead(SENSOR_E);
-    valor_IR_D = digitalRead(SENSOR_D);
-    if (valor_IR_E == HIGH && valor_IR_D == HIGH) {
-      if (virarPara == false) {
-        frenteE(50);
-      } else {
-        frenteD(50);
-      } virarPara = !virarPara;
-    } else if (valor_IR_E == HIGH && valor_IR_D == LOW) {
-      frenteE(50);
-    } else if (valor_IR_E == LOW && valor_IR_D == HIGH) {
-      frenteD(50);
-    } else {
-      tras(100);
+    if (agora - inicioEstado >= TEMPO_CURVA)
+    {
+      estado = SEGUINDO;
+      inicioAvanco = agora;
     }
-  }
 
-  //SEM OBSTACULOS
-  else if (valor_IR_E == HIGH && valor_IR_D == HIGH) {
-    frente(100);
-  }
+    break;
 
-  //MARGEM DE ERRO
-  else {
-    parar();
-  }
+  case VIRANDO_DIREITA:
 
-//fim do loop
+    // A roda esquerda avanca para virar a direita.
+    frenteE(50);
+
+    if (agora - inicioEstado >= TEMPO_CURVA)
+    {
+      estado = SEGUINDO;
+      inicioAvanco = agora;
+    }
+
+    break;
+  }
 }
-
