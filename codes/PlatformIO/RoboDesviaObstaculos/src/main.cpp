@@ -35,6 +35,7 @@ float distance;
 boolean desvio_e = true;
 
 unsigned long inicio_estado, fim_estado, inicio_preso = 0;
+int tempo_preso = 5000;
 
 // ======
 // SETUP
@@ -254,11 +255,11 @@ void loop()
       inicio_preso = millis();
     }
 
-    if (millis() - inicio_preso >= 3000)
+    if (millis() - inicio_preso >= tempo_preso)
     {
       inicio_preso = 0;
 
-      tras(50);
+      tras(80);
       delay(500);
 
       valor_IR_E = digitalRead(SENSOR_E);
@@ -311,11 +312,11 @@ void loop()
       inicio_preso = millis();
     }
 
-    if (millis() - inicio_preso >= 3000)
+    if (millis() - inicio_preso >= tempo_preso)
     {
       inicio_preso = 0;
 
-      tras(50);
+      tras(80);
       delay(500);
 
       valor_IR_E = digitalRead(SENSOR_E);
@@ -343,14 +344,17 @@ void loop()
         frenteE(50);
         valor_IR_E = digitalRead(SENSOR_E);
         valor_IR_D = digitalRead(SENSOR_D);
-        if (valor_IR_E == LOW)
+        if (valor_IR_E == LOW || (millis() - inicio_preso >= tempo_preso))
         {
           break;
         }
       }
       fim_estado = millis() - inicio_estado;
-      frenteD(50);
-      delay(fim_estado / 2);
+      if (millis() - inicio_preso < tempo_preso)
+      {
+        frenteD(50);
+        delay(fim_estado / 2);
+      }
     }
   }
 
@@ -362,11 +366,11 @@ void loop()
       inicio_preso = millis();
     }
 
-    if (millis() - inicio_preso >= 3000)
+    if (millis() - inicio_preso >= tempo_preso)
     {
       inicio_preso = 0;
 
-      tras(50);
+      tras(80);
       delay(500);
 
       valor_IR_E = digitalRead(SENSOR_E);
@@ -394,14 +398,17 @@ void loop()
         frenteD(50);
         valor_IR_E = digitalRead(SENSOR_E);
         valor_IR_D = digitalRead(SENSOR_D);
-        if (valor_IR_D == LOW)
+        if (valor_IR_D == LOW || (millis() - inicio_preso >= tempo_preso))
         {
           break;
         }
       }
       fim_estado = millis() - inicio_estado;
-      frenteE(50);
-      delay(fim_estado / 2);
+      if (millis() - inicio_preso < tempo_preso)
+      {
+        frenteE(50);
+        delay(fim_estado / 2);
+      }
     }
   }
   // fim do loop
