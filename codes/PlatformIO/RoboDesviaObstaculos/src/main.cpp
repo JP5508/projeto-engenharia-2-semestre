@@ -34,7 +34,7 @@ float distance;
 
 boolean desvio_e = true;
 
-unsigned long inicio_estado, fim_estado, inicio_frente = 0;
+unsigned long inicio_estado, fim_estado, inicio_preso = 0;
 
 // ======
 // SETUP
@@ -246,17 +246,17 @@ void loop()
     desvio_e = !desvio_e;
   }
 
-  //CAMINHO LIVRE
+  // CAMINHO LIVRE
   else if (valor_IR_E == HIGH && valor_IR_D == HIGH)
   {
-    if (inicio_frente == 0)
+    if (inicio_preso == 0)
     {
-      inicio_frente = millis();
+      inicio_preso = millis();
     }
 
-    if (millis() - inicio_frente >= 5000)
+    if (millis() - inicio_preso >= 3000)
     {
-      inicio_frente = 0;
+      inicio_preso = 0;
 
       tras(50);
       delay(500);
@@ -306,41 +306,103 @@ void loop()
   // OBSTACULO NO DIREITA
   else if (valor_IR_E == HIGH && valor_IR_D == LOW)
   {
-    // vira até o obstaculo sair do sensor direito
-    inicio_estado = millis();
-    while (valor_IR_D == LOW)
+    if (inicio_preso == 0)
     {
-      frenteE(50);
+      inicio_preso = millis();
+    }
+
+    if (millis() - inicio_preso >= 3000)
+    {
+      inicio_preso = 0;
+
+      tras(50);
+      delay(500);
+
       valor_IR_E = digitalRead(SENSOR_E);
       valor_IR_D = digitalRead(SENSOR_D);
-      if (valor_IR_E == LOW)
+
+      if (desvio_e == true && valor_IR_E == HIGH)
       {
-        break;
+        frenteE(80);
+        delay(500);
       }
+      else if (valor_IR_D == HIGH)
+      {
+        frenteD(80);
+        delay(500);
+      }
+
+      desvio_e = !desvio_e;
     }
-    fim_estado = millis() - inicio_estado;
-    frenteD(50);
-    delay(fim_estado / 2);
+    else
+    {
+      // vira até o obstaculo sair do sensor direito
+      inicio_estado = millis();
+      while (valor_IR_D == LOW)
+      {
+        frenteE(50);
+        valor_IR_E = digitalRead(SENSOR_E);
+        valor_IR_D = digitalRead(SENSOR_D);
+        if (valor_IR_E == LOW)
+        {
+          break;
+        }
+      }
+      fim_estado = millis() - inicio_estado;
+      frenteD(50);
+      delay(fim_estado / 2);
+    }
   }
 
   // OBSTACULO NA ESQUERDA
   else if (valor_IR_E == LOW && valor_IR_D == HIGH)
   {
-    // vira até o obstaculo sair do sensor esquerdo
-    inicio_estado = millis();
-    while (valor_IR_E == LOW)
+    if (inicio_preso == 0)
     {
-      frenteD(50);
+      inicio_preso = millis();
+    }
+
+    if (millis() - inicio_preso >= 3000)
+    {
+      inicio_preso = 0;
+
+      tras(50);
+      delay(500);
+
       valor_IR_E = digitalRead(SENSOR_E);
       valor_IR_D = digitalRead(SENSOR_D);
-      if (valor_IR_D == LOW)
+
+      if (desvio_e == true && valor_IR_E == HIGH)
       {
-        break;
+        frenteE(80);
+        delay(500);
       }
+      else if (valor_IR_D == HIGH)
+      {
+        frenteD(80);
+        delay(500);
+      }
+
+      desvio_e = !desvio_e;
     }
-    fim_estado = millis() - inicio_estado;
-    frenteE(50);
-    delay(fim_estado / 2);
+    else
+    {
+      // vira até o obstaculo sair do sensor esquerdo
+      inicio_estado = millis();
+      while (valor_IR_E == LOW)
+      {
+        frenteD(50);
+        valor_IR_E = digitalRead(SENSOR_E);
+        valor_IR_D = digitalRead(SENSOR_D);
+        if (valor_IR_D == LOW)
+        {
+          break;
+        }
+      }
+      fim_estado = millis() - inicio_estado;
+      frenteE(50);
+      delay(fim_estado / 2);
+    }
   }
   // fim do loop
 }
