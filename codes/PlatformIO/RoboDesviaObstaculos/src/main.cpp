@@ -22,9 +22,6 @@
 #define ENA 14
 #define ENB 32
 
-// LED DO ESP
-#define LED 2
-
 // ==================
 // VARIÁVEIS GLOBAIS
 // ==================
