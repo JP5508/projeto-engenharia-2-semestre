@@ -103,67 +103,59 @@ void tras(int porc)
 void frenteE(int porc)
 {
 
-  // Motor esquerdo anda
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, HIGH);
 
-  // Motor direito para
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
 
   // Velocidade PWM
   int vel = (porc * 255) / 100;
   analogWrite(ENA, vel);
-  analogWrite(ENB, vel);
+  analogWrite(ENB, 0);
 }
 
 void frenteD(int porc)
 {
 
-  // Motor esquerdo para
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
 
-  // Motor direito anda
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
 
   // Velocidade PWM
   int vel = (porc * 255) / 100;
-  analogWrite(ENA, vel);
+  analogWrite(ENA, 0);
   analogWrite(ENB, vel);
 }
 void trasE(int porc)
 {
 
-  // Motor esquerdo anda
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
 
-  // Motor direito para
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
 
   // Velocidade PWM
   int vel = (porc * 255) / 100;
   analogWrite(ENA, vel);
-  analogWrite(ENB, vel);
+  analogWrite(ENB, 0);
 }
 
 void trasD(int porc)
 {
 
-  // Motor esquerdo para
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
 
-  // Motor direito anda
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, HIGH);
 
   // Velocidade PWM
   int vel = (porc * 255) / 100;
-  analogWrite(ENA, vel);
+  analogWrite(ENA, 0);
   analogWrite(ENB, vel);
 }
 
