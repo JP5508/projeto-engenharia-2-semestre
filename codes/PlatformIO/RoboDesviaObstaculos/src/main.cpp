@@ -26,11 +26,16 @@
 // VARIÁVEIS GLOBAIS
 // ==================
 
-#define DIST_CRITICA 15
-#define DIST_ALERTA 25
+#define DIST_CRITICA 12
+#define DIST_ALERTA 20
 
 long duration;
 float distance;
+
+bool desvio_e = true;
+
+unsigned long inicio_preso = 0;
+const int tempo_preso = 5000;
 
 // ======
 // SETUP
@@ -38,25 +43,19 @@ float distance;
 
 void setup()
 {
-
-  // ESP
   Serial.begin(115200);
 
-  // Ultrassônico
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 
-  // Sensores IR
   pinMode(SENSOR_E, INPUT);
   pinMode(SENSOR_D, INPUT);
 
-  // Motores
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
 
-  // Velocidade
   pinMode(ENA, OUTPUT);
   pinMode(ENB, OUTPUT);
 }
@@ -67,110 +66,103 @@ void setup()
 
 void frente(int porc)
 {
-
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, HIGH);
 
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
+
   analogWrite(ENA, vel);
   analogWrite(ENB, vel);
 }
 
 void tras(int porc)
 {
-
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
 
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, HIGH);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
+
   analogWrite(ENA, vel);
   analogWrite(ENB, vel);
 }
 
 void frenteE(int porc)
 {
-
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, HIGH);
 
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
+
   analogWrite(ENA, vel);
   analogWrite(ENB, 0);
 }
 
 void frenteD(int porc)
 {
-
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
 
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
+
   analogWrite(ENA, 0);
   analogWrite(ENB, vel);
 }
+
 void trasE(int porc)
 {
-
   digitalWrite(IN1, HIGH);
   digitalWrite(IN2, LOW);
 
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
+
   analogWrite(ENA, vel);
   analogWrite(ENB, 0);
 }
 
 void trasD(int porc)
 {
-
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
 
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, HIGH);
 
-  // Velocidade PWM
   int vel = (porc * 255) / 100;
+
   analogWrite(ENA, 0);
   analogWrite(ENB, vel);
 }
 
 void parar()
 {
-
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
 
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
 
-  // Velocidade PWM
   analogWrite(ENA, 0);
   analogWrite(ENB, 0);
 }
 
-// ========================
+// ==========================
 // LEITURA DO ULTRASSÔNICO
-// ========================
+// ==========================
 
 float lerDistancia()
 {
@@ -188,7 +180,14 @@ float lerDistancia()
 
     long duracao = pulseIn(ECHO_PIN, HIGH, 30000);
 
-    soma += duracao * 0.0343 / 2;
+    if (duracao == 0)
+    {
+      soma += 999;
+    }
+    else
+    {
+      soma += duracao * 0.0343 / 2;
+    }
 
     delay(5);
   }
@@ -202,104 +201,134 @@ float lerDistancia()
 
 void loop()
 {
-
-  // ========================
-  // LEITURA DO ULTRASSÔNICO
-  // ========================
-
   distance = lerDistancia();
-
-  // ===============
-  // LEITURA DOS IR
-  // ===============
 
   int valor_IR_E = digitalRead(SENSOR_E);
   int valor_IR_D = digitalRead(SENSOR_D);
 
-  // ==================
-  // LÓGICA DE DECISÃO
-  // ==================
+  // DEBUG
+  /*
+  Serial.print("Dist: ");
+  Serial.print(distance);
+  Serial.print(" | E: ");
+  Serial.print(valor_IR_E);
+  Serial.print(" | D: ");
+  Serial.println(valor_IR_D);
+  */
 
-  if (distance > DIST_ALERTA)
+  // ==========================
+  // CAMINHO COMPLETAMENTE LIVRE
+  // ==========================
+
+  if (distance > DIST_ALERTA &&
+      valor_IR_E == HIGH &&
+      valor_IR_D == HIGH)
   {
-    // Caminho livre
+    inicio_preso = 0;
+    frente(100);
+  }
 
-    if (valor_IR_E == 0 && valor_IR_D == 1)
+  // ==========================
+  // OBSTÁCULO À DIREITA
+  // ==========================
+
+  else if (valor_IR_D == LOW &&
+           valor_IR_E == HIGH)
+  {
+    if (inicio_preso == 0)
+      inicio_preso = millis();
+
+    frenteE(60);
+
+    if (millis() - inicio_preso > tempo_preso)
     {
-      // Obstáculo à esquerda
-      frenteD(55);
-    }
+      tras(60);
+      delay(300);
 
-    else if (valor_IR_D == 0 && valor_IR_E == 1)
+      frenteE(80);
+      delay(300);
+
+      inicio_preso = 0;
+    }
+  }
+
+  // ==========================
+  // OBSTÁCULO À ESQUERDA
+  // ==========================
+
+  else if (valor_IR_E == LOW &&
+           valor_IR_D == HIGH)
+  {
+    if (inicio_preso == 0)
+      inicio_preso = millis();
+
+    frenteD(60);
+
+    if (millis() - inicio_preso > tempo_preso)
     {
-      // Obstáculo à direita
-      frenteE(55);
-    }
+      tras(60);
+      delay(300);
 
+      frenteD(80);
+      delay(300);
+
+      inicio_preso = 0;
+    }
+  }
+
+  // ==========================
+  // OBSTÁCULOS DOS DOIS LADOS
+  // ==========================
+
+  else if (valor_IR_E == LOW &&
+           valor_IR_D == LOW)
+  {
+    tras(60);
+    delay(300);
+
+    if (desvio_e)
+    {
+      frenteE(80);
+      delay(350);
+    }
     else
     {
-      frente(70);
+      frenteD(80);
+      delay(350);
     }
+
+    desvio_e = !desvio_e;
   }
 
-  else if (distance > DIST_CRITICA)
+  // ==========================
+  // OBSTÁCULO À FRENTE
+  // ==========================
+
+  else if (distance <= DIST_CRITICA)
   {
-    // Aproximando de algo
+    tras(60);
+    delay(250);
 
-    frente(50);
+    if (desvio_e)
+    {
+      frenteE(80);
+      delay(350);
+    }
+    else
+    {
+      frenteD(80);
+      delay(350);
+    }
+
+    desvio_e = !desvio_e;
   }
+
+  // ==========================
+  // APROXIMANDO DE ALGO
+  // ==========================
 
   else
   {
-    // Obstáculo muito próximo
-
-    frente(40);
-
-    // Esquerda livre
-    if (valor_IR_E == 1 && valor_IR_D == 0)
-    {
-      while (distance < DIST_CRITICA)
-      {
-        frenteE(70);
-
-        distance = lerDistancia();
-      }
-    }
-
-    // Direita livre
-    else if (valor_IR_D == 1 && valor_IR_E == 0)
-    {
-      while (distance < DIST_CRITICA)
-      {
-        frenteD(70);
-
-        distance = lerDistancia();
-      }
-    }
-
-    // Ambos livres
-    else if (valor_IR_D == 1 && valor_IR_E == 1)
-    {
-      while (distance < DIST_CRITICA)
-      {
-        frenteD(70);
-
-        distance = lerDistancia();
-      }
-    }
-
-    // Encurralado
-    else
-    {
-      tras(60);
-      delay(400);
-
-      while (distance < DIST_CRITICA)
-      {
-        frenteD(70);
-
-        distance = lerDistancia();
-      }
-    }
+    frente(70);
   }
 }
