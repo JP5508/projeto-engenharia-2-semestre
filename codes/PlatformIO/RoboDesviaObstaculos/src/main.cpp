@@ -43,7 +43,6 @@ void setup()
 
   // ESP
   Serial.begin(115200);
-  pinMode(LED, OUTPUT);
 
   // Ultrassônico
   pinMode(TRIG_PIN, OUTPUT);
@@ -76,8 +75,6 @@ void frente(int porc)
 
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
-
-  digitalWrite(LED, HIGH);
 
   // Velocidade PWM
   int vel = (porc * 255) / 100;
@@ -168,8 +165,6 @@ void parar()
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
 
-  digitalWrite(LED, LOW);
-
   // Velocidade PWM
   analogWrite(ENA, 0);
   analogWrite(ENB, 0);
@@ -216,189 +211,6 @@ void loop()
   // LÓGICA DE DECISÃO
   // ==================
 
-  // OBSTACULO MUITO PERTO
-  if (distance < 10)
-  {
-    tras(50);
-    delay(500);
-    valor_IR_E = digitalRead(SENSOR_E);
-    valor_IR_D = digitalRead(SENSOR_D);
-    if (desvio_e == true && valor_IR_E == HIGH)
-    {
-      frenteE(80);
-      delay(500);
-    }
-    else if (valor_IR_D == HIGH)
-    {
-      frenteD(80);
-      delay(500);
-    }
-    desvio_e = !desvio_e;
-  }
-
-  // CAMINHO LIVRE
-  else if (valor_IR_E == HIGH && valor_IR_D == HIGH)
-  {
-    if (inicio_preso == 0)
-    {
-      inicio_preso = millis();
-    }
-
-    if (millis() - inicio_preso >= tempo_preso)
-    {
-      inicio_preso = 0;
-
-      tras(80);
-      delay(500);
-
-      valor_IR_E = digitalRead(SENSOR_E);
-      valor_IR_D = digitalRead(SENSOR_D);
-
-      if (desvio_e == true && valor_IR_E == HIGH)
-      {
-        frenteE(80);
-        delay(500);
-      }
-      else if (valor_IR_D == HIGH)
-      {
-        frenteD(80);
-        delay(500);
-      }
-
-      desvio_e = !desvio_e;
-    }
-    else
-    {
-      frente(100);
-    }
-  }
-
-  // OBSTACULOS AO REDOR
-  else if (valor_IR_E == LOW && valor_IR_D == LOW)
-  {
-    tras(50);
-    delay(1000);
-    valor_IR_E = digitalRead(SENSOR_E);
-    valor_IR_D = digitalRead(SENSOR_D);
-    if (desvio_e == true && valor_IR_E == HIGH)
-    {
-      frenteE(80);
-      delay(800);
-    }
-    else if (valor_IR_D == HIGH)
-    {
-      frenteD(80);
-      delay(800);
-    }
-    desvio_e = !desvio_e;
-  }
-
-  // OBSTACULO NO DIREITA
-  else if (valor_IR_E == HIGH && valor_IR_D == LOW)
-  {
-    if (inicio_preso == 0)
-    {
-      inicio_preso = millis();
-    }
-
-    if (millis() - inicio_preso >= tempo_preso)
-    {
-      inicio_preso = 0;
-
-      tras(80);
-      delay(500);
-
-      valor_IR_E = digitalRead(SENSOR_E);
-      valor_IR_D = digitalRead(SENSOR_D);
-
-      if (desvio_e == true && valor_IR_E == HIGH)
-      {
-        frenteE(80);
-        delay(500);
-      }
-      else if (valor_IR_D == HIGH)
-      {
-        frenteD(80);
-        delay(500);
-      }
-
-      desvio_e = !desvio_e;
-    }
-    else
-    {
-      // vira até o obstaculo sair do sensor direito
-      inicio_estado = millis();
-      while (valor_IR_D == LOW)
-      {
-        frenteE(50);
-        valor_IR_E = digitalRead(SENSOR_E);
-        valor_IR_D = digitalRead(SENSOR_D);
-        if (valor_IR_E == LOW || (millis() - inicio_preso >= tempo_preso))
-        {
-          break;
-        }
-      }
-      fim_estado = millis() - inicio_estado;
-      if (millis() - inicio_preso < tempo_preso)
-      {
-        frenteD(50);
-        delay(fim_estado / 2);
-      }
-    }
-  }
-
-  // OBSTACULO NA ESQUERDA
-  else if (valor_IR_E == LOW && valor_IR_D == HIGH)
-  {
-    if (inicio_preso == 0)
-    {
-      inicio_preso = millis();
-    }
-
-    if (millis() - inicio_preso >= tempo_preso)
-    {
-      inicio_preso = 0;
-
-      tras(80);
-      delay(500);
-
-      valor_IR_E = digitalRead(SENSOR_E);
-      valor_IR_D = digitalRead(SENSOR_D);
-
-      if (desvio_e == true && valor_IR_E == HIGH)
-      {
-        frenteE(80);
-        delay(500);
-      }
-      else if (valor_IR_D == HIGH)
-      {
-        frenteD(80);
-        delay(500);
-      }
-
-      desvio_e = !desvio_e;
-    }
-    else
-    {
-      // vira até o obstaculo sair do sensor esquerdo
-      inicio_estado = millis();
-      while (valor_IR_E == LOW)
-      {
-        frenteD(50);
-        valor_IR_E = digitalRead(SENSOR_E);
-        valor_IR_D = digitalRead(SENSOR_D);
-        if (valor_IR_D == LOW || (millis() - inicio_preso >= tempo_preso))
-        {
-          break;
-        }
-      }
-      fim_estado = millis() - inicio_estado;
-      if (millis() - inicio_preso < tempo_preso)
-      {
-        frenteE(50);
-        delay(fim_estado / 2);
-      }
-    }
-  }
+  
   // fim do loop
 }
