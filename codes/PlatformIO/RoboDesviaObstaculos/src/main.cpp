@@ -26,16 +26,15 @@
 // VARIÁVEIS GLOBAIS
 // ==================
 
-#define DIST_CRITICA 12
-#define DIST_ALERTA 20
+#define DIST_ALERTA 30
+#define DIST_CRITICA 20
 
-long duration;
 float distance;
 
 bool desvio_e = true;
 
 unsigned long inicio_preso = 0;
-const int tempo_preso = 5000;
+const unsigned long tempo_preso = 4000;
 
 // ======
 // SETUP
@@ -206,129 +205,69 @@ void loop()
   int valor_IR_E = digitalRead(SENSOR_E);
   int valor_IR_D = digitalRead(SENSOR_D);
 
-  // DEBUG
-  /*
-  Serial.print("Dist: ");
-  Serial.print(distance);
-  Serial.print(" | E: ");
-  Serial.print(valor_IR_E);
-  Serial.print(" | D: ");
-  Serial.println(valor_IR_D);
-  */
-
-  // ==========================
-  // CAMINHO COMPLETAMENTE LIVRE
-  // ==========================
-
-  if (distance > DIST_ALERTA &&
-      valor_IR_E == HIGH &&
-      valor_IR_D == HIGH)
+  // EMERGÊNCIA
+  if (distance <= DIST_CRITICA)
   {
-    inicio_preso = 0;
-    frente(100);
-  }
-
-  // ==========================
-  // OBSTÁCULO À DIREITA
-  // ==========================
-
-  else if (valor_IR_D == LOW &&
-           valor_IR_E == HIGH)
-  {
-    if (inicio_preso == 0)
-      inicio_preso = millis();
-
-    frenteE(60);
-
-    if (millis() - inicio_preso > tempo_preso)
-    {
-      tras(60);
-      delay(300);
-
-      frenteE(80);
-      delay(300);
-
-      inicio_preso = 0;
-    }
-  }
-
-  // ==========================
-  // OBSTÁCULO À ESQUERDA
-  // ==========================
-
-  else if (valor_IR_E == LOW &&
-           valor_IR_D == HIGH)
-  {
-    if (inicio_preso == 0)
-      inicio_preso = millis();
-
-    frenteD(60);
-
-    if (millis() - inicio_preso > tempo_preso)
-    {
-      tras(60);
-      delay(300);
-
-      frenteD(80);
-      delay(300);
-
-      inicio_preso = 0;
-    }
-  }
-
-  // ==========================
-  // OBSTÁCULOS DOS DOIS LADOS
-  // ==========================
-
-  else if (valor_IR_E == LOW &&
-           valor_IR_D == LOW)
-  {
-    tras(60);
-    delay(300);
-
-    if (desvio_e)
-    {
-      frenteE(80);
-      delay(350);
-    }
-    else
-    {
-      frenteD(80);
-      delay(350);
-    }
-
-    desvio_e = !desvio_e;
-  }
-
-  // ==========================
-  // OBSTÁCULO À FRENTE
-  // ==========================
-
-  else if (distance <= DIST_CRITICA)
-  {
-    tras(60);
+    tras(70);
     delay(250);
 
     if (desvio_e)
     {
-      frenteE(80);
+      frenteE(100);
+      delay(250);
+    }
+    else
+    {
+      frenteD(100);
+      delay(250);
+    }
+
+    desvio_e = !desvio_e;
+    return;
+  }
+
+  // IR esquerdo detectou algo
+  if (valor_IR_E == LOW && valor_IR_D == HIGH)
+  {
+    frenteD(60);
+    return;
+  }
+
+  // IR direito detectou algo
+  if (valor_IR_D == LOW && valor_IR_E == HIGH)
+  {
+    frenteE(60);
+    return;
+  }
+
+  // ambos detectando
+  if (valor_IR_E == LOW && valor_IR_D == LOW)
+  {
+    tras(70);
+    delay(300);
+
+    if (desvio_e)
+    {
+      frenteE(100);
       delay(350);
     }
     else
     {
-      frenteD(80);
+      frenteD(100);
       delay(350);
     }
 
     desvio_e = !desvio_e;
+    return;
   }
 
-  // ==========================
-  // APROXIMANDO DE ALGO
-  // ==========================
-
-  else
+  // aproximação frontal
+  if (distance <= DIST_ALERTA)
   {
     frente(70);
+  }
+  else
+  {
+    frente(100);
   }
 }
