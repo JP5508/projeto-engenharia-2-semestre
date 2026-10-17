@@ -26,13 +26,11 @@
 // VARIÁVEIS GLOBAIS
 // ==================
 
+#define DIST_CRITICA 15
+#define DIST_ALERTA 25
+
 long duration;
 float distance;
-
-boolean desvio_e = true;
-
-unsigned long inicio_estado, fim_estado, inicio_preso = 0;
-int tempo_preso = 5000;
 
 // ======
 // SETUP
@@ -170,6 +168,34 @@ void parar()
   analogWrite(ENB, 0);
 }
 
+// ========================
+// LEITURA DO ULTRASSÔNICO
+// ========================
+
+float lerDistancia()
+{
+  float soma = 0;
+
+  for (int i = 0; i < 5; i++)
+  {
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+
+    digitalWrite(TRIG_PIN, LOW);
+
+    long duracao = pulseIn(ECHO_PIN, HIGH, 30000);
+
+    soma += duracao * 0.0343 / 2;
+
+    delay(5);
+  }
+
+  return soma / 5.0;
+}
+
 // =====
 // LOOP
 // =====
@@ -181,24 +207,7 @@ void loop()
   // LEITURA DO ULTRASSÔNICO
   // ========================
 
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-
-  digitalWrite(TRIG_PIN, LOW);
-
-  duration = pulseIn(ECHO_PIN, HIGH, 30000);
-
-  if (duration == 0)
-  {
-    distance = 999;
-  }
-  else
-  {
-    distance = duration * 0.0343 / 2;
-  }
+  distance = lerDistancia();
 
   // ===============
   // LEITURA DOS IR
@@ -211,6 +220,86 @@ void loop()
   // LÓGICA DE DECISÃO
   // ==================
 
-  
-  // fim do loop
+  if (distance > DIST_ALERTA)
+  {
+    // Caminho livre
+
+    if (valor_IR_E == 0 && valor_IR_D == 1)
+    {
+      // Obstáculo à esquerda
+      frenteD(55);
+    }
+
+    else if (valor_IR_D == 0 && valor_IR_E == 1)
+    {
+      // Obstáculo à direita
+      frenteE(55);
+    }
+
+    else
+    {
+      frente(70);
+    }
+  }
+
+  else if (distance > DIST_CRITICA)
+  {
+    // Aproximando de algo
+
+    frente(50);
+  }
+
+  else
+  {
+    // Obstáculo muito próximo
+
+    frente(40);
+
+    // Esquerda livre
+    if (valor_IR_E == 1 && valor_IR_D == 0)
+    {
+      while (distance < DIST_CRITICA)
+      {
+        frenteE(70);
+
+        distance = lerDistancia();
+      }
+    }
+
+    // Direita livre
+    else if (valor_IR_D == 1 && valor_IR_E == 0)
+    {
+      while (distance < DIST_CRITICA)
+      {
+        frenteD(70);
+
+        distance = lerDistancia();
+      }
+    }
+
+    // Ambos livres
+    else if (valor_IR_D == 1 && valor_IR_E == 1)
+    {
+      while (distance < DIST_CRITICA)
+      {
+        frenteD(70);
+
+        distance = lerDistancia();
+      }
+    }
+
+    // Encurralado
+    else
+    {
+      tras(60);
+      delay(400);
+
+      while (distance < DIST_CRITICA)
+      {
+        frenteD(70);
+
+        distance = lerDistancia();
+      }
+    }
+  }
 }
