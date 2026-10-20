@@ -1,44 +1,164 @@
 #include <Arduino.h>
 
 // ====================
-// DEFINIÇÃO DOS PINOS
+// DEFINICAO DOS PINOS
 // ====================
 
-// SENSOR ULTRASSÔNICO
+// Sensor ultrassonico HC-SR04
 #define TRIG_PIN 5
 #define ECHO_PIN 18
 
-// SENSORES IR
+// Sensores infravermelhos
 #define SENSOR_E 35
 #define SENSOR_D 34
 
-// MOTORES
+// Motores - L298N
 #define IN1 25
 #define IN2 26
 #define IN3 27
 #define IN4 33
 
-// CONTROLADORES DE VELOCIDADE
+// Controle de velocidade
 #define ENA 14
 #define ENB 32
 
-// ==================
-// VARIÁVEIS GLOBAIS
-// ==================
+// ====================
+// VARIAVEIS
+// ====================
 
-#define DIST_ALERTA 30
-#define DIST_CRITICA 20
-
+long duration;
 float distance;
 
+// Alterna a direcao se os dois IR detectarem obstaculos
 bool desvio_e = true;
 
-unsigned long inicio_preso = 0;
-const unsigned long tempo_preso = 4000;
+// ====================
+// LEITURA DO ULTRASSONICO
+// ====================
 
-// ======
+float medirDistancia()
+{
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+
+  digitalWrite(TRIG_PIN, LOW);
+
+  duration = pulseIn(ECHO_PIN, HIGH, 30000);
+
+  if (duration == 0)
+  {
+    return 999;
+  }
+
+  return duration * 0.0343 / 2;
+}
+
+// ====================
+// FUNCOES DOS MOTORES
+// ====================
+
+void frente(int porc)
+{
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+
+  int vel = (porc * 255) / 100;
+  analogWrite(ENA, vel);
+  analogWrite(ENB, vel);
+}
+
+void tras(int porc)
+{
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+
+  int vel = (porc * 255) / 100;
+  analogWrite(ENA, vel);
+  analogWrite(ENB, vel);
+}
+
+void frenteE(int porc)
+{
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+
+  int vel = (porc * 255) / 100;
+  analogWrite(ENA, vel);
+  analogWrite(ENB, 0);
+}
+
+void frenteD(int porc)
+{
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+
+  int vel = (porc * 255) / 100;
+  analogWrite(ENA, 0);
+  analogWrite(ENB, vel);
+}
+
+void parar()
+{
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+}
+
+// ====================
+// MANOBRA DE DESVIO
+// ====================
+
+void desviar()
+{
+  int irE = digitalRead(SENSOR_E);
+  int irD = digitalRead(SENSOR_D);
+
+  // Obstaculo detectado a esquerda
+  if (irE == LOW && irD == HIGH)
+  {
+    frenteD(50);
+  }
+
+  // Obstaculo detectado a direita
+  else if (irE == HIGH && irD == LOW)
+  {
+    frenteE(50);
+  }
+
+  // Ambos detectam obstaculo
+  else
+  {
+    if (desvio_e)
+    {
+      frenteE(50);
+    }
+    else
+    {
+      frenteD(50);
+    }
+
+    desvio_e = !desvio_e;
+  }
+}
+
+// ====================
 // SETUP
-// ======
+// ====================
 
 void setup()
 {
@@ -57,217 +177,72 @@ void setup()
 
   pinMode(ENA, OUTPUT);
   pinMode(ENB, OUTPUT);
+
+  parar();
+
+  Serial.println("Robo iniciado!");
 }
 
 // ====================
-// FUNÇÕES DOS MOTORES
+// LOOP PRINCIPAL
 // ====================
-
-void frente(int porc)
-{
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, HIGH);
-
-  digitalWrite(IN3, HIGH);
-  digitalWrite(IN4, LOW);
-
-  int vel = (porc * 255) / 100;
-
-  analogWrite(ENA, vel);
-  analogWrite(ENB, vel);
-}
-
-void tras(int porc)
-{
-  digitalWrite(IN1, HIGH);
-  digitalWrite(IN2, LOW);
-
-  digitalWrite(IN3, LOW);
-  digitalWrite(IN4, HIGH);
-
-  int vel = (porc * 255) / 100;
-
-  analogWrite(ENA, vel);
-  analogWrite(ENB, vel);
-}
-
-void frenteE(int porc)
-{
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, HIGH);
-
-  digitalWrite(IN3, LOW);
-  digitalWrite(IN4, LOW);
-
-  int vel = (porc * 255) / 100;
-
-  analogWrite(ENA, vel);
-  analogWrite(ENB, 0);
-}
-
-void frenteD(int porc)
-{
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, LOW);
-
-  digitalWrite(IN3, HIGH);
-  digitalWrite(IN4, LOW);
-
-  int vel = (porc * 255) / 100;
-
-  analogWrite(ENA, 0);
-  analogWrite(ENB, vel);
-}
-
-void trasE(int porc)
-{
-  digitalWrite(IN1, HIGH);
-  digitalWrite(IN2, LOW);
-
-  digitalWrite(IN3, LOW);
-  digitalWrite(IN4, LOW);
-
-  int vel = (porc * 255) / 100;
-
-  analogWrite(ENA, vel);
-  analogWrite(ENB, 0);
-}
-
-void trasD(int porc)
-{
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, LOW);
-
-  digitalWrite(IN3, LOW);
-  digitalWrite(IN4, HIGH);
-
-  int vel = (porc * 255) / 100;
-
-  analogWrite(ENA, 0);
-  analogWrite(ENB, vel);
-}
-
-void parar()
-{
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, LOW);
-
-  digitalWrite(IN3, LOW);
-  digitalWrite(IN4, LOW);
-
-  analogWrite(ENA, 0);
-  analogWrite(ENB, 0);
-}
-
-// ==========================
-// LEITURA DO ULTRASSÔNICO
-// ==========================
-
-float lerDistancia()
-{
-  float soma = 0;
-
-  for (int i = 0; i < 5; i++)
-  {
-    digitalWrite(TRIG_PIN, LOW);
-    delayMicroseconds(2);
-
-    digitalWrite(TRIG_PIN, HIGH);
-    delayMicroseconds(10);
-
-    digitalWrite(TRIG_PIN, LOW);
-
-    long duracao = pulseIn(ECHO_PIN, HIGH, 30000);
-
-    if (duracao == 0)
-    {
-      soma += 999;
-    }
-    else
-    {
-      soma += duracao * 0.0343 / 2;
-    }
-
-    delay(5);
-  }
-
-  return soma / 5.0;
-}
-
-// =====
-// LOOP
-// =====
 
 void loop()
 {
-  distance = lerDistancia();
+  distance = medirDistancia();
 
-  int valor_IR_E = digitalRead(SENSOR_E);
-  int valor_IR_D = digitalRead(SENSOR_D);
+  int irE = digitalRead(SENSOR_E);
+  int irD = digitalRead(SENSOR_D);
 
-  // EMERGÊNCIA
-  if (distance <= DIST_CRITICA)
+  Serial.print("Distancia: ");
+  Serial.print(distance);
+  Serial.print(" cm | IR esquerdo: ");
+  Serial.print(irE);
+  Serial.print(" | IR direito: ");
+  Serial.println(irD);
+
+  // 1. OBSTACULO MUITO PROXIMO
+  // A unica condicao que aciona a marcha a re.
+  if (distance < 10)
   {
-    tras(70);
-    delay(250);
+    Serial.println("Muito perto! Recuando.");
 
-    if (desvio_e)
-    {
-      frenteE(100);
-      delay(250);
-    }
-    else
-    {
-      frenteD(100);
-      delay(250);
-    }
-
-    desvio_e = !desvio_e;
-    return;
-  }
-
-  // IR esquerdo detectou algo
-  if (valor_IR_E == LOW && valor_IR_D == HIGH)
-  {
-    frenteD(60);
-    return;
-  }
-
-  // IR direito detectou algo
-  if (valor_IR_D == LOW && valor_IR_E == HIGH)
-  {
-    frenteE(60);
-    return;
-  }
-
-  // ambos detectando
-  if (valor_IR_E == LOW && valor_IR_D == LOW)
-  {
-    tras(70);
+    tras(40);
     delay(300);
 
-    if (desvio_e)
+    desviar();
+    delay(350);
+  }
+
+  // 2. OBSTACULO PROXIMO
+  else if (distance < 30)
+  {
+    Serial.println("Obstaculo proximo! Reduzindo.");
+
+    // Se os IR detectarem algo, corrigir a direcao.
+    if (irE == LOW || irD == LOW)
     {
-      frenteE(100);
-      delay(350);
+      desviar();
     }
     else
     {
-      frenteD(100);
-      delay(350);
+      frente(45);
     }
-
-    desvio_e = !desvio_e;
-    return;
   }
 
-  // aproximação frontal
-  if (distance <= DIST_ALERTA)
+  // 3. OBSTACULOS DETECTADOS PELOS IR
+  else if (irE == LOW || irD == LOW)
   {
-    frente(70);
+    Serial.println("Desviando pelos sensores IR.");
+
+    desviar();
   }
+
+  // 4. CAMINHO LIVRE
   else
   {
     frente(100);
   }
+
+  delay(20);
 }
