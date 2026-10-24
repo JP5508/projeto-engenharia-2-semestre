@@ -18,7 +18,7 @@ Ano letivo: 2026
 ## 📘 Descrição do Projeto
 O projeto é composto por duas partes integradas:
 
-### 🪫 Site de Divulgação
+### 🪫 HARDWARE
 Um robô/veículo autônomo montado nas seguintes especificações:
 - Microcontrolador ESP32
 - 2 motores DC na traseira do veículo;
@@ -29,7 +29,7 @@ Um robô/veículo autônomo montado nas seguintes especificações:
 - Alimentado por 2 baterias de 4.2V;
 - Chassi em MDF.
 
-### 💻 Catálogo de Produtos
+### 💻 SOFTWARE
 Código criado em **C++** para o **ESP32**, com as seguintes funcionalidades:
 - Mover para frente e para os lado;
 - Controle da velocidade dos motores;
