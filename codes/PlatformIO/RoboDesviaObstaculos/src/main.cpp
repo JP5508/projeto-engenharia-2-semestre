@@ -216,7 +216,7 @@ void loop()
     // ------------------------------------------------------
     case AVANCANDO:
     {
-      if (distance < DIST_MIN || (obsE && obsD))
+      if (distance < DIST_MIN)
       {
         iniciarEscape(agora);
       }
@@ -242,7 +242,7 @@ void loop()
     // ------------------------------------------------------
     case CURVANDO:
     {
-      if (distance < DIST_MIN || (obsE && obsD) || (agora - tEstado > TEMPO_CURVA_MAX))
+      if (distance < DIST_MIN || (agora - tEstado > TEMPO_CURVA_MAX))
       {
         iniciarEscape(agora);
         break;
