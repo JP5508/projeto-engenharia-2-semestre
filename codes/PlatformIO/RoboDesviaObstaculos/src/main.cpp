@@ -1,11 +1,19 @@
 #include <Arduino.h>
 
 // ============================================================
-// ROBÔ DESVIADOR DE OBSTÁCULOS - ESP32  (versão 2)
-// Foco: reagir ANTES de chegar na parede e girar de verdade
+// ROBÔ DESVIADOR DE OBSTÁCULOS - ESP32  (versão 3)
+// Projeto MK2 - Engenharia da Computação - Senac Santo Amaro
+//
+// Ideia: lógica simples e reativa (como a que funcionou melhor),
+// mas sem delay() bloqueante e com curvas terminadas por SENSOR
+// (não por tempo fixo), para não depender da carga da bateria.
+//
+// Estados: ANDANDO -> DESVIANDO -> (RE) -> DESVIANDO -> ANDANDO
+// Todos os parâmetros de ajuste ficam no bloco "AJUSTES".
 // ============================================================
 
-#define DEBUG 1   // 1 = imprime estado e sensores no Serial a cada 200 ms
+#define DEBUG 1                    // 1 = imprime estado/sensores no Serial (115200)
+#define MODO_SOMENTE_SENSORES 0    // 1 = motores desligados, só mostra os sensores (teste de bancada)
 
 // ---------- PINOS ----------
 #define TRIG_PIN 5
@@ -21,50 +29,118 @@
 #define ENA 14
 #define ENB 32
 
+// Pela lógica dos testes anteriores: motor A = roda DIREITA, motor B = roda ESQUERDA
+// (rodar só o motor A faz o carro virar para a ESQUERDA).
+// Se no teste o carro virar PARA o obstáculo em vez de fugir, troque para true.
+const bool INVERTER_LADOS = false;
 
-// ---------- PARÂMETROS AJUSTÁVEIS ----------
+// ============================================================
+// AJUSTES
+// ============================================================
+
 // Velocidades (%)
-const int VEL_CRUZEIRO   = 70;   // velocidade normal (100% deixa o robô sem tempo de reagir)
-const int VEL_ALERTA_MIN = 45;   // velocidade ao chegar perto da DIST_MIN
-const int VEL_CURVA      = 70;   // roda de fora nas curvas laterais
-const int VEL_PIVO       = 65;   // giro no lugar
-const int VEL_RE         = 60;
+const int VEL_CRUZEIRO  = 85;   // reta livre
+const int VEL_APROX     = 55;   // chegando perto de algo
+const int VEL_CURVA_EXT = 80;   // roda de fora nas curvas
+const int VEL_CURVA_INT = 0;    // roda de dentro (0 = parada, como funcionou melhor; negativo = gira no lugar)
+const int VEL_RE        = 60;
 
-// PWM mínimo em que o motor realmente gira (abaixo disso ele só zumbe).
-// Aumente se o robô não sair do lugar em velocidades baixas.
-const int PWM_MIN = 90;
+// PWM mínimo em que o motor realmente move o carro (abaixo disso só zumbe)
+const int PWM_MIN = 80;
 
-// Distâncias (cm) do ultrassônico
-const float DIST_ALERTA = 20.0;  // começa a desacelerar
-const float DIST_MIN    = 12.0;  // para e desvia
-const float DIST_LIVRE  = 25.0;  // só considera o caminho livre depois de passar disso
+// Distâncias do ultrassônico (cm)
+const float DIST_ALERTA = 35.0;  // começa a desacelerar
+const float DIST_DESVIO = 20.0;  // começa a desviar (curva) sem dar ré
+const float DIST_PARE   = 9.0;   // muito perto: ré
+const float DIST_LIVRE  = 30.0;  // só considera o caminho livre acima disso (histerese)
 
 // Tempos (ms)
-const unsigned long FOLGA_CURVA_MS   = 150;   // continua curvando um pouco depois do IR liberar
-const unsigned long TEMPO_RE_MS      = 350;
-const unsigned long TEMPO_RE_LONGO   = 900;   // quando está preso (várias tentativas seguidas)
-const unsigned long TEMPO_PIVO_MIN   = 250;   // pivô mínimo antes de checar se liberou
-const unsigned long TEMPO_PIVO_MAX   = 1800;  // desiste do pivô e tenta de novo
-const unsigned long TEMPO_CURVA_MAX  = 4000;  // curva lateral sem sucesso = preso
-const unsigned long INTERVALO_US_MS  = 30;    // intervalo entre leituras do ultrassônico
-const unsigned long TIMEOUT_ECHO_US  = 4000;  // ~68 cm de alcance (suficiente para DIST_ALERTA)
+const unsigned long IR_DEBOUNCE_MS      = 30;    // IR precisa ficar ativo esse tempo (filtra ruído de luz)
+const unsigned long FOLGA_CURVA_MS      = 150;   // continua curvando um pouco depois do IR liberar
+const unsigned long FOLGA_DESVIO_MS     = 150;   // continua desviando um pouco depois de liberar
+const unsigned long TEMPO_RE_MS         = 300;
+const unsigned long TEMPO_RE_LONGO_MS   = 700;   // quando está preso (várias tentativas seguidas)
+const unsigned long TEMPO_DESVIO_MAX_MS = 1500;  // desvio que não libera = tenta de novo pelo outro lado
+const unsigned long JANELA_PRESO_MS     = 5000;  // 3 rés dentro dessa janela = "preso"
+const unsigned long LADO_RECENTE_MS     = 1500;  // quanto tempo lembra de qual lado o IR viu algo
+const unsigned long INTERVALO_US_MS     = 30;    // intervalo entre leituras do ultrassônico
+const unsigned long TIMEOUT_ECHO_US     = 5000;  // ~85 cm de alcance
+const unsigned long ATRASO_INICIAL_MS   = 1000;  // espera ao ligar (tire a mão). Use 0 para largar direto
 
-// ---------- ESTADOS ----------
-enum Estado { AVANCANDO, CURVANDO, RE, GIRANDO };
-Estado estado = AVANCANDO;
+// Lado preferido quando não há nenhuma informação dos IR
+enum Lado { ESQ, DIR };
+const Lado LADO_PADRAO = ESQ;
+
+// ============================================================
+// ESTADO
+// ============================================================
+
+enum Estado { ANDANDO, RE, DESVIANDO };
+Estado estado = ANDANDO;
 
 unsigned long tEstado = 0;
-unsigned long fimCurva = 0;
 unsigned long ultimaLeitura = 0;
-unsigned long tUltimaTentativa = 0;
 unsigned long ultimoDebug = 0;
 
-bool curvaD = true;     // lado da curva lateral atual
-bool fugirD = true;     // true = pivô como frenteD (afasta de obstáculo na direita)
-int  tentativas = 0;
-
+// leituras
 float distance = 999;
 bool obsE = false, obsD = false;
+unsigned long irE_desde = 0, irD_desde = 0;   // desde quando o IR está em LOW (0 = livre)
+int zerosSeguidos = 0;
+
+// memória do último lado visto pelos IR
+bool ultimoObsFoiE = false;
+unsigned long tUltimoObs = 0;
+
+// curva lateral (IR)
+Lado curvaLado = ESQ;
+unsigned long curvaAte = 0;
+
+// desvio / ré
+Lado ladoDesvio = ESQ;
+Lado proximoPadrao = LADO_PADRAO;
+unsigned long livreDesde = 0;
+unsigned long tempoReAtual = TEMPO_RE_MS;
+unsigned long tUltimaRe = 0;
+int tentativas = 0;
+
+// ============================================================
+// PWM (funciona no core Arduino-ESP32 2.x e 3.x)
+// ============================================================
+
+const int PWM_FREQ = 1000;
+const int PWM_BITS = 8;
+
+void pwmInit()
+{
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  ledcAttach(ENA, PWM_FREQ, PWM_BITS);
+  ledcAttach(ENB, PWM_FREQ, PWM_BITS);
+#else
+  ledcSetup(0, PWM_FREQ, PWM_BITS);
+  ledcAttachPin(ENA, 0);
+  ledcSetup(1, PWM_FREQ, PWM_BITS);
+  ledcAttachPin(ENB, 1);
+#endif
+}
+
+void pwmA(int duty)
+{
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  ledcWrite(ENA, duty);
+#else
+  ledcWrite(0, duty);
+#endif
+}
+
+void pwmB(int duty)
+{
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  ledcWrite(ENB, duty);
+#else
+  ledcWrite(1, duty);
+#endif
+}
 
 // ============================================================
 // MOTORES  (vel: -100 a 100)
@@ -77,33 +153,51 @@ int velParaPwm(int vel)
   return map(vel, 1, 100, PWM_MIN, 255);
 }
 
+// motor A (mesma fiação dos testes: IN2 HIGH = frente)
 void motorA(int vel)
 {
   vel = constrain(vel, -100, 100);
   digitalWrite(IN1, vel < 0 ? HIGH : LOW);
   digitalWrite(IN2, vel > 0 ? HIGH : LOW);
-  analogWrite(ENA, velParaPwm(vel));
+  pwmA(velParaPwm(vel));
 }
 
+// motor B (IN3 HIGH = frente)
 void motorB(int vel)
 {
   vel = constrain(vel, -100, 100);
   digitalWrite(IN3, vel > 0 ? HIGH : LOW);
   digitalWrite(IN4, vel < 0 ? HIGH : LOW);
-  analogWrite(ENB, velParaPwm(vel));
+  pwmB(velParaPwm(vel));
 }
 
-void frente(int p) { motorA(p);  motorB(p); }
-void tras(int p)   { motorA(-p); motorB(-p); }
-void parar()       { motorA(0);  motorB(0); }
+// Controle por roda física: esquerda e direita
+void rodas(int esq, int dir)
+{
+  if (!INVERTER_LADOS)
+  {
+    motorB(esq);
+    motorA(dir);
+  }
+  else
+  {
+    motorA(esq);
+    motorB(dir);
+  }
+}
 
-// Mesmo sentido de giro que a frenteD / frenteE do código original:
-// "D" = afasta de obstáculo na direita, "E" = afasta de obstáculo na esquerda.
-// Se o robô girar PARA o lado do obstáculo, troque os sinais destas 4 funções.
-void pivoD(int p)       { motorA(p);  motorB(-p); }  // gira no lugar
-void pivoE(int p)       { motorA(-p); motorB(p);  }
-void curvaFugirD(int p) { motorA(p);  motorB(0);  }  // curva fechada (uma roda parada)
-void curvaFugirE(int p) { motorA(0);  motorB(p);  }
+void frente(int p) { rodas(p, p); }
+void tras(int p)   { rodas(-p, -p); }
+void parar()       { rodas(0, 0); }
+
+// Curva em arco: ESQ = foge para a esquerda (roda direita faz força)
+void arco(Lado lado)
+{
+  if (lado == ESQ) rodas(VEL_CURVA_INT, VEL_CURVA_EXT);
+  else             rodas(VEL_CURVA_EXT, VEL_CURVA_INT);
+}
+
+Lado oposto(Lado l) { return (l == ESQ) ? DIR : ESQ; }
 
 // ============================================================
 // ULTRASSÔNICO (mediana de 3 leituras)
@@ -133,35 +227,105 @@ float lerDistancia()
 }
 
 // ============================================================
-// AUXILIARES
+// SENSORES
 // ============================================================
-
-void mudarEstado(Estado novo)
-{
-  estado = novo;
-  tEstado = millis();
-}
 
 void atualizarSensores(unsigned long agora)
 {
+  // ---- ultrassônico ----
   if (agora - ultimaLeitura >= INTERVALO_US_MS)
   {
-    distance = lerDistancia();
+    float nova = lerDistancia();
+
+    // Sem eco logo depois de uma leitura próxima, andando para a frente, quase sempre é
+    // superfície inclinada (triângulo/círculo) ou obstáculo abaixo da distância mínima do
+    // sensor - NÃO é caminho livre. Assume que continua se aproximando por até 3 leituras.
+    if (nova >= 999.0)
+    {
+      if (estado == ANDANDO && zerosSeguidos < 3 && distance < 40.0)
+      {
+        zerosSeguidos++;
+        nova = distance * 0.75;
+      }
+    }
+    else
+    {
+      zerosSeguidos = 0;
+    }
+
+    distance = nova;
     ultimaLeitura = agora;
   }
-  obsE = (digitalRead(SENSOR_E) == LOW);
-  obsD = (digitalRead(SENSOR_D) == LOW);
+
+  // ---- IR (LOW = obstáculo) com debounce por tempo ----
+  if (digitalRead(SENSOR_E) == LOW) { if (irE_desde == 0) irE_desde = agora; }
+  else irE_desde = 0;
+
+  if (digitalRead(SENSOR_D) == LOW) { if (irD_desde == 0) irD_desde = agora; }
+  else irD_desde = 0;
+
+  obsE = (irE_desde != 0) && (agora - irE_desde >= IR_DEBOUNCE_MS);
+  obsD = (irD_desde != 0) && (agora - irD_desde >= IR_DEBOUNCE_MS);
+
+  // lembra de qual lado o IR viu algo (só se foi um lado)
+  if (obsE && !obsD) { ultimoObsFoiE = true;  tUltimoObs = agora; }
+  if (obsD && !obsE) { ultimoObsFoiE = false; tUltimoObs = agora; }
 }
 
-// Para, dá ré e depois gira no lugar até o caminho liberar
-void iniciarEscape(unsigned long agora)
+// ============================================================
+// DECISÃO
+// ============================================================
+
+// Escolhe para qual lado fugir
+Lado escolherLado(unsigned long agora)
 {
-  if (agora - tUltimaTentativa > 4000) tentativas = 0;  // faz tempo que não travava
+  if (obsD && !obsE) return ESQ;   // obstáculo na direita -> foge para a esquerda
+  if (obsE && !obsD) return DIR;
+
+  // IR viu algo há pouco: foge do lado onde estava
+  if (tUltimoObs != 0 && (agora - tUltimoObs) < LADO_RECENTE_MS)
+    return ultimoObsFoiE ? DIR : ESQ;
+
+  // sem informação: alterna
+  Lado l = proximoPadrao;
+  proximoPadrao = oposto(proximoPadrao);
+  return l;
+}
+
+void mudarEstado(Estado novo, unsigned long agora)
+{
+  estado = novo;
+  tEstado = agora;
+}
+
+void iniciarDesvio(Lado lado, unsigned long agora)
+{
+  ladoDesvio = lado;
+  livreDesde = 0;
+  mudarEstado(DESVIANDO, agora);
+}
+
+void iniciarRe(Lado ladoDepois, unsigned long agora)
+{
+  if (agora - tUltimaRe > JANELA_PRESO_MS) tentativas = 0;  // faz tempo que não travava
   tentativas++;
-  tUltimaTentativa = agora;
+  tUltimaRe = agora;
+
+  tempoReAtual = (tentativas >= 3) ? TEMPO_RE_LONGO_MS : TEMPO_RE_MS;
+  ladoDesvio = ladoDepois;
+  curvaAte = 0;
 
   tras(VEL_RE);
-  mudarEstado(RE);
+  mudarEstado(RE, agora);
+}
+
+// Desacelera conforme se aproxima de algo
+int velocidadePorDistancia()
+{
+  if (distance >= DIST_ALERTA) return VEL_CRUZEIRO;
+  float f = (distance - DIST_DESVIO) / (DIST_ALERTA - DIST_DESVIO);
+  f = constrain(f, 0.0f, 1.0f);
+  return VEL_APROX + (int)((VEL_CRUZEIRO - VEL_APROX) * f);
 }
 
 #if DEBUG
@@ -169,9 +333,10 @@ void debug(unsigned long agora)
 {
   if (agora - ultimoDebug < 200) return;
   ultimoDebug = agora;
-  const char* nomes[] = {"AVANCANDO", "CURVANDO", "RE", "GIRANDO"};
-  Serial.printf("%-9s dist=%5.1f  E=%d D=%d  tent=%d\n",
-                nomes[estado], distance, obsE, obsD, tentativas);
+  const char* nomes[] = {"ANDANDO", "RE", "DESVIANDO"};
+  Serial.printf("%-9s dist=%6.1f  E=%d D=%d  lado=%s  tent=%d\n",
+                nomes[estado], distance, obsE, obsD,
+                ladoDesvio == ESQ ? "ESQ" : "DIR", tentativas);
 }
 #endif
 
@@ -192,10 +357,12 @@ void setup()
   pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
-  pinMode(ENA, OUTPUT);
-  pinMode(ENB, OUTPUT);
 
+  pwmInit();
   parar();
+
+  delay(ATRASO_INICIAL_MS);
+  tEstado = millis();
 }
 
 // ============================================================
@@ -211,85 +378,101 @@ void loop()
   debug(agora);
 #endif
 
+#if MODO_SOMENTE_SENSORES
+  parar();
+  return;
+#endif
+
   switch (estado)
   {
     // ------------------------------------------------------
-    case AVANCANDO:
+    case ANDANDO:
     {
-      if (distance < DIST_MIN)
+      if (distance < DIST_PARE)
       {
-        iniciarEscape(agora);
+        // encostou: ré e depois desvia
+        iniciarRe(escolherLado(agora), agora);
       }
-      else if (obsD || obsE)
+      else if (obsE && obsD && distance < DIST_ALERTA)
       {
-        curvaD = obsD;
-        fimCurva = agora + FOLGA_CURVA_MS;
-        mudarEstado(CURVANDO);
+        // dois lados + frente fechada: beco/quina
+        iniciarRe(escolherLado(agora), agora);
       }
-      else if (distance < DIST_ALERTA)
+      else if (distance < DIST_DESVIO)
       {
-        // desacelera conforme se aproxima do obstáculo
-        float f = (distance - DIST_MIN) / (DIST_ALERTA - DIST_MIN);
-        frente(VEL_ALERTA_MIN + (int)((VEL_CRUZEIRO - VEL_ALERTA_MIN) * f));
+        // obstáculo à frente: já começa a desviar, sem ré
+        iniciarDesvio(escolherLado(agora), agora);
       }
       else
       {
-        frente(VEL_CRUZEIRO);
+        // IR lateral: curva leve para longe do obstáculo
+        if (obsD && !obsE)      { curvaLado = ESQ; curvaAte = agora + FOLGA_CURVA_MS; }
+        else if (obsE && !obsD) { curvaLado = DIR; curvaAte = agora + FOLGA_CURVA_MS; }
+
+        if (agora < curvaAte)
+        {
+          arco(curvaLado);
+        }
+        else
+        {
+          int vel = velocidadePorDistancia();
+          if (obsE && obsD) vel = min(vel, VEL_APROX);   // passagem estreita
+          frente(vel);
+        }
       }
-      break;
-    }
-
-    // ------------------------------------------------------
-    case CURVANDO:
-    {
-      if (distance < DIST_MIN || (agora - tEstado > TEMPO_CURVA_MAX))
-      {
-        iniciarEscape(agora);
-        break;
-      }
-
-      if (obsD)      { curvaD = true;  fimCurva = agora + FOLGA_CURVA_MS; }
-      else if (obsE) { curvaD = false; fimCurva = agora + FOLGA_CURVA_MS; }
-
-      if (curvaD) curvaFugirD(VEL_CURVA); else curvaFugirE(VEL_CURVA);
-
-      if (agora >= fimCurva) mudarEstado(AVANCANDO);
       break;
     }
 
     // ------------------------------------------------------
     case RE:
     {
-      unsigned long tempoRe = (tentativas >= 3) ? TEMPO_RE_LONGO : TEMPO_RE_MS;
+      unsigned long t = agora - tEstado;
 
-      if (agora - tEstado >= tempoRe)
+      // termina quando passou o tempo E já abriu um pouco de espaço (ou dobra o tempo)
+      bool abriuEspaco = distance > (DIST_PARE + 3.0);
+      if ((t >= tempoReAtual && abriuEspaco) || t >= tempoReAtual * 2)
       {
-        // escolhe o lado do giro: foge do lado com obstáculo, senão alterna
-        if (obsD && !obsE)      fugirD = true;
-        else if (obsE && !obsD) fugirD = false;
-        else                    fugirD = !fugirD;
-
-        mudarEstado(GIRANDO);
+        iniciarDesvio(ladoDesvio, agora);
       }
       break;
     }
 
     // ------------------------------------------------------
-    case GIRANDO:
+    case DESVIANDO:
     {
-      if (fugirD) pivoD(VEL_PIVO); else pivoE(VEL_PIVO);
+      arco(ladoDesvio);
 
+      // sensor do lado para onde estamos virando
+      bool obsAlvo = (ladoDesvio == ESQ) ? obsE : obsD;
       unsigned long t = agora - tEstado;
-      unsigned long tMax = (tentativas >= 3) ? 3000 : TEMPO_PIVO_MAX;
+
+      if (distance < DIST_PARE || obsAlvo)
+      {
+        // bateria de obstáculo na direção da fuga: ré e tenta pelo outro lado
+        iniciarRe(oposto(ladoDesvio), agora);
+        break;
+      }
+
       bool livre = (distance > DIST_LIVRE) && !obsE && !obsD;
 
-      if (t >= TEMPO_PIVO_MIN && livre)
+      if (livre)
       {
-        mudarEstado(AVANCANDO);
+        if (livreDesde == 0) livreDesde = agora;
+        if (agora - livreDesde >= FOLGA_DESVIO_MS)
+        {
+          mudarEstado(ANDANDO, agora);
+          break;
+        }
       }
-      else if (t >= tMax)
+      else
       {
-        iniciarEscape(agora);   // não liberou: ré de novo e tenta pelo outro lado
+        livreDesde = 0;
+      }
+
+      if (t >= TEMPO_DESVIO_MAX_MS)
+      {
+        // não liberou: ré e tenta pelo outro lado
+        iniciarRe(oposto(ladoDesvio), agora);
       }
       break;
     }
