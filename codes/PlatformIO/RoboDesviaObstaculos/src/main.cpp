@@ -51,7 +51,7 @@ const int PWM_MIN = 80;
 // Distâncias do ultrassônico (cm)
 const float DIST_ALERTA = 35.0;  // começa a desacelerar
 const float DIST_DESVIO = 20.0;  // começa a desviar (curva) sem dar ré
-const float DIST_PARE   = 9.0;   // muito perto: ré
+const float DIST_PARE   = 10.0;   // muito perto: ré
 const float DIST_LIVRE  = 30.0;  // só considera o caminho livre acima disso (histerese)
 
 // Tempos (ms)
