@@ -30,6 +30,8 @@
 // VARIÁVEIS GLOBAIS
 // ==================
 
+bool start = false; // inicialização
+
 long duration;
 float distance;
 int pwm_adj = 253;
@@ -254,6 +256,17 @@ void decisaoDesvio()
 
 void loop()
 {
+  // ========================
+  // INICIALIZAÇÃO DO ROBÔ
+  // ========================
+
+  if (start == false)
+  {
+    parar();
+    delay(3000);
+    start = true;
+  }
+
   // ========================
   // LEITURA DO ULTRASSÔNICO
   // ========================
