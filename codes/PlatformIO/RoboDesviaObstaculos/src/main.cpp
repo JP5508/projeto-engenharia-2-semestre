@@ -30,7 +30,8 @@ long duration;
 float distance;
 int pwm_adj = 253;
 
-bool desvio_e = true;
+//bool desvio_e = true;
+int lado_desvio = 0;
 
 // ======
 // SETUP
@@ -210,6 +211,7 @@ float lerDistancia()
 // FUNÇÃO DESVIO
 // ====================
 
+/*
 void decisaoDesvio()
 {
   if (desvio_e == true)
@@ -223,6 +225,22 @@ void decisaoDesvio()
     frenteD(100);
     delay(200);
     desvio_e = true;
+  }
+}*/
+
+void decisaoDesvio()
+{
+  if (lado_desvio < 2)
+  {
+    frenteE(100);
+    delay(200);
+    lado_desvio += 1;
+  }
+  else
+  {
+    frenteD(100);
+    delay(200);
+    lado_desvio = 0;
   }
 }
 
