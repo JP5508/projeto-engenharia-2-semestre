@@ -1,3 +1,7 @@
+// =====================
+//  MKII - CÓDIGO FINAL
+// =====================
+
 #include <Arduino.h>
 
 // ====================
@@ -13,14 +17,14 @@
 #define SENSOR_D 34
 
 // MOTORES
-#define IN1 25
+#define IN1 25 // esquerda
 #define IN2 26
-#define IN3 27
+#define IN3 27 // direita
 #define IN4 33
 
 // CONTROLADORES DE VELOCIDADE
-#define ENA 32
-#define ENB 14
+#define ENA 32 // esquerda
+#define ENB 14 // direita
 
 // ==================
 // VARIÁVEIS GLOBAIS
@@ -30,8 +34,8 @@ long duration;
 float distance;
 int pwm_adj = 253;
 
-//bool desvio_e = true;
-int lado_desvio = 0;
+// bool desvio_e = true;
+int lado_desvio = 0; // 2 esquerda, 1 direita.
 
 // ======
 // SETUP
@@ -267,7 +271,7 @@ void loop()
   // LÓGICA DE DECISÃO
   // ==================
 
-  if (distance < 10) // obstáculo muito próximo
+  if (distance < 10) // OBSTÁCULO MUITO PERTO
   {
     while (distance < 18) // pegar distância do obstáculo
     {
@@ -275,28 +279,28 @@ void loop()
       delay(500);
       distance = lerDistancia();
     }
-    decisaoDesvio();
+    decisaoDesvio(); // decidir lado do desvio
   }
 
-  else if (distance < 30) // se aproximando de algum obstáculo
+  else if (distance < 30) // SE APROXIMANDO DE ALGUM OBSTÁCULO
   {
-    if (IR_E == LOW && IR_D == HIGH)
+    if (IR_E == LOW && IR_D == HIGH) // obstaculo à esquerda
     {
       trasE(80);
       delay(100);
       frenteD(80);
       delay(100);
     }
-    else if (IR_E == HIGH && IR_D == LOW)
+    else if (IR_E == HIGH && IR_D == LOW) // obstaculo à direita
     {
       trasD(80);
       delay(100);
       frenteE(80);
       delay(100);
     }
-    else if (IR_E == LOW && IR_D == LOW)
+    else if (IR_E == LOW && IR_D == LOW) // obstaculos em ambos os lados
     {
-      while (IR_E == LOW && IR_D == LOW)
+      while (IR_E == LOW && IR_D == LOW) // pegar distância dos obstáculos
       {
         tras(100);
         delay(500);
@@ -304,31 +308,31 @@ void loop()
         IR_D = digitalRead(SENSOR_D);
       }
     }
-    else
+    else // continuar em frente
     {
       frente(100);
     }
   }
 
-  else // caminho fronta "livre"
+  else // CAMINHO FRONTAL "LIVRE"
   {
-    if (IR_E == LOW && IR_D == HIGH)
+    if (IR_E == LOW && IR_D == HIGH) // obstaculo à esquerda
     {
       trasE(80);
       delay(100);
       frenteD(80);
       delay(100);
     }
-    else if (IR_E == HIGH && IR_D == LOW)
+    else if (IR_E == HIGH && IR_D == LOW) // obstaculo à direita
     {
       trasD(80);
       delay(100);
       frenteE(80);
       delay(100);
     }
-    else if (IR_E == LOW && IR_D == LOW)
+    else if (IR_E == LOW && IR_D == LOW) // obstaculos em ambos os lados
     {
-      while (IR_E == LOW && IR_D == LOW)
+      while (IR_E == LOW && IR_D == LOW) // pegar distância dos obstáculos
       {
         tras(100);
         delay(500);
@@ -336,7 +340,7 @@ void loop()
         IR_D = digitalRead(SENSOR_D);
       }
     }
-    else
+    else // continuar em frente
     {
       frente(100);
     }

@@ -36,3 +36,4 @@ Código criado em **C++** para o **ESP32**, com as seguintes funcionalidades:
 - Detecção de obstáculos pelos sensores infravermelhos;
 - Detecção de obstáculos pelo sensor ultrassônico;
 - Lógica de decisão para desvio de obstáculos.
+- Código Final funcionando: MKII
