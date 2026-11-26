@@ -300,7 +300,7 @@ void loop()
 
   if (distance < 10) // OBSTÁCULO MUITO PERTO
   {
-    while (distance < 18) // pegar distância do obstáculo
+    while (distance < 20) // pegar distância do obstáculo
     {
       tras(100);
       delay(500);
@@ -314,16 +314,16 @@ void loop()
     if (IR_E == LOW && IR_D == HIGH) // obstaculo à esquerda
     {
       trasE(80);
-      delay(100);
+      delay(200);
       frenteD(80);
-      delay(100);
+      delay(200);
     }
     else if (IR_E == HIGH && IR_D == LOW) // obstaculo à direita
     {
       trasD(80);
-      delay(100);
+      delay(200);
       frenteE(80);
-      delay(100);
+      delay(200);
     }
     else if (IR_E == LOW && IR_D == LOW) // obstaculos em ambos os lados
     {
@@ -346,16 +346,16 @@ void loop()
     if (IR_E == LOW && IR_D == HIGH) // obstaculo à esquerda
     {
       trasE(80);
-      delay(100);
+      delay(200);
       frenteD(80);
-      delay(100);
+      delay(200);
     }
     else if (IR_E == HIGH && IR_D == LOW) // obstaculo à direita
     {
       trasD(80);
-      delay(100);
+      delay(200);
       frenteE(80);
-      delay(100);
+      delay(200);
     }
     else if (IR_E == LOW && IR_D == LOW) // obstaculos em ambos os lados
     {
