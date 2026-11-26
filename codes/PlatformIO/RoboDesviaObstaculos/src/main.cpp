@@ -8,6 +8,9 @@
 // DEFINIÇÃO DOS PINOS
 // ====================
 
+// LED DO ESP
+#define LED_ESP 2
+
 // SENSOR ULTRASSÔNICO
 #define TRIG_PIN 5
 #define ECHO_PIN 18
@@ -45,6 +48,9 @@ int lado_desvio = 0; // 2 esquerda, 1 direita.
 
 void setup()
 {
+  //Led do ESP
+  pinMode(LED_ESP, OUTPUT);
+
   // Ultrassônico
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
@@ -260,10 +266,18 @@ void loop()
   // INICIALIZAÇÃO DO ROBÔ
   // ========================
 
-  if (start == false)
+  if (start == false) // só uma única vez quando ligar o carrinho
   {
     parar();
-    delay(3000);
+    delay(500);
+    for (int i = 0; i < 3; i++) //pisca o led 3 vezes
+    {
+      digitalWrite(LED_ESP, HIGH);
+      delay(500);
+      digitalWrite(LED_ESP, LOW);
+      delay(500);
+    }
+    digitalWrite(LED_ESP, HIGH); // deixa o led aceso
     start = true;
   }
 
