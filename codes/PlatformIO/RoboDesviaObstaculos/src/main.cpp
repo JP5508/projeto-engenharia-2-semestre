@@ -37,7 +37,7 @@ bool start = false; // inicialização
 
 long duration;
 float distance;
-int pwm_adj = 253;
+int pwm_adj = 252;
 
 // bool desvio_e = true;
 int lado_desvio = 0; // 2 esquerda, 1 direita.
